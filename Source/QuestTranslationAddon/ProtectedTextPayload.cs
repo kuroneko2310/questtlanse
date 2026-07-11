@@ -13,7 +13,6 @@ namespace QuestTranslationAddon
     internal sealed class ProtectedTextPayload
     {
         private const string TokenStem = "QTSHIELD_";
-        private const string TokenOpen = "{" + TokenStem;
 
         private static readonly Regex TranslatableEnglishRegex =
             new Regex(@"[A-Za-z]{2,}", RegexOptions.Compiled);
@@ -21,11 +20,12 @@ namespace QuestTranslationAddon
         private static readonly Regex LeakedBasePlaceholderRegex =
             new Regex(@"__PH\s*\d+\s*__", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+        // Every Arabic-numeral run is protected, including digits touching Japanese text or IDs.
         private static readonly Regex NumberLikeRegex =
-            new Regex(@"(?<![\p{L}\p{N}_])[-+]?\d+(?:[.,:/-]\d+)*(?:[%‰]|[A-Za-z]{1,4})?(?![\p{L}\p{N}_])", RegexOptions.Compiled);
+            new Regex(@"[-+]?\d+(?:[.,:/-]\d+)*(?:[%‰]|[A-Za-z]{1,4})?", RegexOptions.Compiled);
 
         private static readonly Regex TagRegex =
-            new Regex(@"<(/?)([A-Za-z][A-Za-z0-9]*)(?:\s[^>]*)?(/?)>", RegexOptions.Compiled);
+            new Regex(@"<(/?)([A-Za-z][A-Za-z0-9]*)(?:=[^>\s]+|\s[^>]*)?(/?)>", RegexOptions.Compiled);
 
         private static readonly Regex[] FixedProtectionPatterns =
         {
@@ -35,9 +35,12 @@ namespace QuestTranslationAddon
             new Regex(@"\[[^\[\]\r\n]+\]", RegexOptions.Compiled),
             new Regex(@"\\[nrt]", RegexOptions.Compiled),
             new Regex(@"https?://[^\s<>{}\[\]]+|www\.[^\s<>{}\[\]]+", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
             new Regex(@"(?:[A-Za-z]:\\|/)[^\s<>{}\[\]]+", RegexOptions.Compiled),
             new Regex(@"\b[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\b", RegexOptions.Compiled),
+            new Regex(@"\b0x[0-9A-Fa-f]+\b", RegexOptions.Compiled),
             new Regex(@"\bQuest\d+(?:\.[A-Za-z][A-Za-z0-9_]*)+\b", RegexOptions.Compiled),
+            new Regex(@"\b(?=[A-Za-z0-9-]*\d)[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+\b", RegexOptions.Compiled),
             new Regex(@"\b[A-Za-z][A-Za-z0-9]*(?:[_./:\\][A-Za-z0-9]+)+\b", RegexOptions.Compiled),
             new Regex(@"(?<![A-Za-z0-9])(?:[a-z]+[A-Z][A-Za-z0-9]*|[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+)(?![A-Za-z0-9])", RegexOptions.Compiled),
             new Regex(@"\b(?:[A-Z]{2,}[A-Z0-9]*|[A-Za-z]+\d+[A-Za-z0-9]*)\b", RegexOptions.Compiled),
@@ -156,7 +159,6 @@ namespace QuestTranslationAddon
             }
 
             if (result.IndexOf(TokenStem, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                result.IndexOf(TokenOpen, StringComparison.OrdinalIgnoreCase) >= 0 ||
                 LeakedBasePlaceholderRegex.IsMatch(result))
             {
                 return false;
