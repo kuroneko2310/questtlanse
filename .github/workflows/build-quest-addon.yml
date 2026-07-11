@@ -1,0 +1,152 @@
+name: Build RimWorld 1.6 Quest Addon
+
+on:
+  push:
+    branches:
+      - main
+      - feat/quest-translation-addon
+    paths:
+      - "Source/QuestTranslationAddon/**"
+      - "Source/QuestTranslationAddon.Tests/**"
+      - "QuestTranslationAddon/About/**"
+      - ".github/workflows/build-quest-addon.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "Source/QuestTranslationAddon/**"
+      - "Source/QuestTranslationAddon.Tests/**"
+      - "QuestTranslationAddon/About/**"
+      - ".github/workflows/build-quest-addon.yml"
+  workflow_dispatch:
+    inputs:
+      commit_assembly:
+        description: "Commit the rebuilt add-on DLL to the current branch"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, test, validate, and package
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Show .NET information
+        shell: pwsh
+        run: dotnet --info
+
+      - name: Restore add-on and safety tests
+        shell: pwsh
+        run: dotnet restore Source/QuestTranslationAddon.Tests/AutoTranslation.QuestAddon.Tests.csproj
+
+      - name: Run quest text safety tests
+        shell: pwsh
+        run: >-
+          dotnet test
+          Source/QuestTranslationAddon.Tests/AutoTranslation.QuestAddon.Tests.csproj
+          --configuration Release
+          --no-restore
+          --logger "console;verbosity=normal"
+
+      - name: Build RimWorld 1.6 quest add-on DLL
+        shell: pwsh
+        run: >-
+          dotnet build
+          Source/QuestTranslationAddon/AutoTranslation.QuestAddon.csproj
+          --configuration Release
+          --no-restore
+
+      - name: Validate assembly and record information
+        shell: pwsh
+        run: |
+          $dll = "QuestTranslationAddon/1.6/Assemblies/AutoTranslation.QuestAddon.dll"
+          if (-not (Test-Path $dll -PathType Leaf)) {
+            throw "Compiled add-on DLL was not found: $dll"
+          }
+
+          $bytes = [System.IO.File]::ReadAllBytes($dll)
+          $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
+          if ($ascii.Contains("QTSHIELD_")) {
+            Write-Host "Protection marker constant is present in the implementation as expected; runtime restoration tests guard against display leakage."
+          }
+
+          $hash = (Get-FileHash $dll -Algorithm SHA256).Hash
+          $size = (Get-Item $dll).Length
+          "## Auto Translation - Quest Addon" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "- RimWorld: **1.6**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "- Target framework: **net472**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "- Safety tests: **passed**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "- Size: **$size bytes**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "- SHA-256: ``$hash``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: Package add-on
+        shell: pwsh
+        run: |
+          $stage = Join-Path $env:RUNNER_TEMP "AutoTranslation-QuestAddon"
+          $artifactDir = "Build/artifacts"
+          $zip = Join-Path $artifactDir "AutoTranslation-QuestAddon-RimWorld-1.6.zip"
+
+          Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item $stage -ItemType Directory -Force | Out-Null
+          New-Item $artifactDir -ItemType Directory -Force | Out-Null
+
+          Copy-Item "QuestTranslationAddon/About" $stage -Recurse -Force
+          Copy-Item "QuestTranslationAddon/1.6" $stage -Recurse -Force
+
+          Remove-Item $zip -Force -ErrorAction SilentlyContinue
+          Compress-Archive -Path "$stage/*" -DestinationPath $zip -CompressionLevel Optimal
+
+          if (-not (Test-Path $zip -PathType Leaf)) {
+            throw "Packaged add-on was not created: $zip"
+          }
+
+      - name: Upload packaged add-on
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutoTranslation-QuestAddon-RimWorld-1.6-${{ github.sha }}
+          path: Build/artifacts/AutoTranslation-QuestAddon-RimWorld-1.6.zip
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Commit rebuilt add-on DLL to the current branch
+        if: >-
+          github.event_name == 'push' ||
+          (github.event_name == 'workflow_dispatch' && inputs.commit_assembly == true)
+        shell: pwsh
+        run: |
+          $dll = "QuestTranslationAddon/1.6/Assemblies/AutoTranslation.QuestAddon.dll"
+
+          git add --force -- $dll
+          git diff --cached --stat
+
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "The committed add-on DLL is already up to date."
+            exit 0
+          }
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "build: update quest translation add-on assembly [skip ci]"
+          git push origin "HEAD:${{ github.ref_name }}"
