@@ -9,24 +9,38 @@ namespace AutoTranslation.Utilities
 {
     internal static class Helpers
     {
-        public static string FitFormat(this string str, int cnt)
+        private static readonly Regex IndexedFormatPlaceholderRegex =
+            new Regex(@"\{(\d+)\}", RegexOptions.Compiled);
+
+        public static string FitFormat(this string str, int argumentCount)
         {
-            //str = str.Replace("\"{", "{").Replace("}\"", "}")
-            //    .Replace("「{", "{").Replace("}」", "}");
-            var pattern = @"\{\d+\}";
-            var matches = Regex.Matches(str, pattern);
-            var curCnt = matches.Count;
-            if (curCnt == cnt) return str;
-            if (curCnt > cnt)
+            if (string.IsNullOrEmpty(str))
             {
-                return Regex.Replace(str, pattern, match => int.Parse(match.Groups[1].Value) >= cnt ? "" : match.Value);
+                return str;
             }
-            var sb = new StringBuilder(str);
-            if (curCnt < cnt)
+
+            if (argumentCount < 0)
             {
-                while (curCnt < cnt) sb.Append($"|{{{curCnt++}}}|");
+                argumentCount = 0;
             }
-            return sb.ToString();
+
+            // string.Format safely ignores unused arguments, so missing placeholders do not
+            // need to be synthesized. Adding artificial |{n}| markers can leak implementation
+            // details into the game text and break immersion.
+            //
+            // Only remove placeholders whose numeric index cannot be satisfied by the supplied
+            // argument array. The capture group is explicit; the previous pattern had no group 1
+            // and threw IndexOutOfRangeException when this branch was reached.
+            return IndexedFormatPlaceholderRegex.Replace(str, match =>
+            {
+                int index;
+                if (!int.TryParse(match.Groups[1].Value, out index))
+                {
+                    return match.Value;
+                }
+
+                return index < argumentCount ? match.Value : string.Empty;
+            });
         }
 
         public static (string, List<string>) ToFormatString(this string str)
@@ -270,4 +284,3 @@ namespace AutoTranslation.Utilities
         }
     }
 }
-
