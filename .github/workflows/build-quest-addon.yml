@@ -57,7 +57,9 @@ jobs:
 
       - name: Restore add-on and safety tests
         shell: pwsh
-        run: dotnet restore Source/QuestTranslationAddon.Tests/AutoTranslation.QuestAddon.Tests.csproj
+        run: |
+          dotnet restore Source/QuestTranslationAddon.Tests/AutoTranslation.QuestAddon.Tests.csproj
+          dotnet restore Source/QuestTranslationAddon/AutoTranslation.QuestAddon.csproj
 
       - name: Run quest text safety tests
         shell: pwsh
