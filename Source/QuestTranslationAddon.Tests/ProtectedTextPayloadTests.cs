@@ -29,6 +29,22 @@ namespace QuestTranslationAddon.Tests
         }
 
         [Fact]
+        public void DigitsTouchingJapaneseAndHyphenatedIdsAreShielded()
+        {
+            const string original = "Recover beacon abc-123-def from 第123号区域.";
+
+            ProtectedTextPayload payload;
+            Assert.True(ProtectedTextPayload.TryCreate(original, "Japanese", out payload));
+            Assert.DoesNotContain("abc-123-def", payload.ProtectedText);
+            Assert.DoesNotContain("123", payload.ProtectedText);
+
+            string restored;
+            Assert.True(payload.TryRestore(payload.ProtectedText.Replace("Recover beacon", "ビーコンを回収"), out restored));
+            Assert.Contains("abc-123-def", restored);
+            Assert.Contains("第123号区域", restored);
+        }
+
+        [Fact]
         public void MissingTemporaryMarkerRejectsEntireTranslation()
         {
             const string original = "Bring 25 medicine to 日本語拠点.";
