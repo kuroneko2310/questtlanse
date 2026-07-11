@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -38,10 +39,15 @@ namespace QuestTranslationAddon
                 return;
             }
 
-            var languageName = LanguageDatabase.activeLanguage.LegacyFolderName;
+            var languageName = LanguageDatabase.activeLanguage.LegacyFolderName ??
+                               LanguageDatabase.activeLanguage.folderName ??
+                               string.Empty;
             var originalName = quest.name ?? string.Empty;
             var originalDescription = quest.description.RawText ?? string.Empty;
-            var record = QuestRecords.GetOrCreateValue(quest);
+            var record = QuestRecords.GetValue(quest, delegate(Quest ignored)
+            {
+                return new QuestRecord();
+            });
 
             lock (record.SyncRoot)
             {
@@ -54,7 +60,6 @@ namespace QuestTranslationAddon
             }
 
             QueueField(
-                quest,
                 record,
                 "title",
                 originalName,
@@ -70,7 +75,6 @@ namespace QuestTranslationAddon
                 });
 
             QueueField(
-                quest,
                 record,
                 "description",
                 originalDescription,
@@ -116,7 +120,6 @@ namespace QuestTranslationAddon
         }
 
         private static void QueueField(
-            Quest quest,
             QuestRecord record,
             string fieldKind,
             string originalText,
@@ -154,7 +157,7 @@ namespace QuestTranslationAddon
             };
 
             var requestKey = modPackageId + "|" + fieldKind + "|" + languageName + "|" + sourceHash;
-            var pending = PendingTranslations.GetOrAdd(requestKey, delegate
+            var pending = PendingTranslations.GetOrAdd(requestKey, delegate(string ignored)
             {
                 return new PendingTranslation();
             });
