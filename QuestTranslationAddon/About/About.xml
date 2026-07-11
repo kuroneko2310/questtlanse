@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>Auto Translation - Quest Addon</name>
+  <author>kuroneko2310</author>
+  <packageId>kuroneko2310.autotranslation.questaddon</packageId>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+  <modDependencies>
+    <li>
+      <packageId>brrainz.harmony</packageId>
+      <displayName>Harmony</displayName>
+      <steamWorkshopUrl>steam://url/CommunityFilePage/2009463077</steamWorkshopUrl>
+    </li>
+    <li>
+      <packageId>seohyeon.autotranslation</packageId>
+      <displayName>Auto Translation</displayName>
+    </li>
+  </modDependencies>
+  <loadAfter>
+    <li>brrainz.harmony</li>
+    <li>seohyeon.autotranslation</li>
+  </loadAfter>
+  <description>
+    Adds safe runtime translation for dynamically generated RimWorld quest titles and descriptions.
+
+    English text can be translated even when it is mixed with Japanese. Existing Japanese text, numbers, IDs, DefNames, URLs, formatting tags, and placeholders are protected and restored exactly. If any temporary protection token cannot be restored, the add-on discards the translation and keeps the original text so internal tokens never appear in game.
+  </description>
+</ModMetaData>
